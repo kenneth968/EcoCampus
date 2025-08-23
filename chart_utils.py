@@ -249,3 +249,45 @@ class ChartUtils:
         export_df = pd.merge(merged_df, temp_summary, on='City', how='left')
         
         return export_df
+    
+    def create_efficiency_chart_from_merged(self, merged_df):
+        """Create efficiency chart from merged data"""
+        # Filter out projects with no consumption or capacity data
+        efficiency_df = merged_df[
+            (merged_df['Year_total_KwH'] > 0) & 
+            (merged_df['total_HE'] > 0) & 
+            (merged_df['kwh_per_student'] > 0)
+        ].copy()
+        
+        if not efficiency_df.empty:
+            fig = px.scatter(
+                efficiency_df,
+                x='total_HE',
+                y='kwh_per_student',
+                size='Year_total_KwH',
+                color='City',
+                hover_data=['project_name', 'Year_total_KwH'],
+                title='Energieffektivitet: kWh per Student vs Antall Studenter',
+                labels={
+                    'total_HE': 'Antall Studenter (HE)',
+                    'kwh_per_student': 'kWh per Student',
+                    'Year_total_KwH': 'Totalt Forbruk'
+                }
+            )
+            
+            fig.update_layout(
+                xaxis_title='Antall Studenter (HE)',
+                yaxis_title='kWh per Student'
+            )
+            
+            return fig
+        else:
+            fig = go.Figure()
+            fig.add_annotation(
+                text="Ingen effektivitetsdata tilgjengelig",
+                xref="paper", yref="paper",
+                x=0.5, y=0.5, xanchor='center', yanchor='middle',
+                showarrow=False, font_size=16
+            )
+            fig.update_layout(title='Energieffektivitetsanalyse')
+            return fig

@@ -23,11 +23,19 @@ st.set_page_config(
 def load_data():
     """Load and process all data files"""
     processor = DataProcessor()
-    return processor.load_all_data()
+    data = processor.load_all_data()
+    # Merge consumption with static data for easier handling
+    merged_data = processor.merge_consumption_with_static(data['electricity'], data['static'])
+    return {
+        'temperature': data['temperature'],
+        'static': data['static'], 
+        'electricity': data['electricity'],
+        'merged': merged_data
+    }
 
 def main():
-    st.title("🌿 Miljøfyrtårn Environmental Management Dashboard")
-    st.markdown("*Student Housing Energy Consumption Analytics*")
+    st.title("🌿 Miljøfyrtårn Miljøledelsessystem")
+    st.markdown("*Energiforbruk i Studentboliger*")
     
     # Load data
     try:
@@ -35,93 +43,109 @@ def main():
         temp_data = data['temperature']
         static_data = data['static']
         electricity_data = data['electricity']
+        merged_data = data['merged']
         
         # Initialize utilities
         map_utils = MapUtils()
         chart_utils = ChartUtils()
         
         # Sidebar filters
-        st.sidebar.header("🔍 Filters")
+        st.sidebar.header("🔍 Filter")
         
         # City filter
-        cities = ['All'] + sorted(static_data['City'].dropna().unique().tolist())
-        selected_city = st.sidebar.selectbox("Select City", cities)
+        cities = ['Alle'] + sorted(merged_data['City'].dropna().unique().tolist())
+        selected_city = st.sidebar.selectbox("Velg by", cities)
         
         # Year filter
-        years = ['All'] + sorted([str(year) for year in electricity_data['Year'].unique()])
-        selected_year = st.sidebar.selectbox("Select Year", years)
+        years = ['Alle'] + sorted([str(year) for year in electricity_data['Year'].unique()])
+        selected_year = st.sidebar.selectbox("Velg år", years)
         
-        # Project type filter
-        project_types = ['All'] + sorted(static_data['project_type'].unique().tolist())
-        selected_project_type = st.sidebar.selectbox("Select Project Type", project_types)
+        # Project filter (instead of project type)
+        projects = ['Alle'] + sorted(merged_data['project_name'].unique().tolist())
+        selected_project = st.sidebar.selectbox("Velg prosjekt", projects)
+        
+        # Map color metric toggle
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("🗺️ Kartfarge")
+        color_metric = st.sidebar.radio(
+            "Vis kart basert på:",
+            ['kwh_per_m2', 'kwh_per_student'],
+            format_func=lambda x: 'kWh per m²' if x == 'kwh_per_m2' else 'kWh per student'
+        )
         
         # Filter data based on selections
-        filtered_static = static_data.copy()
+        filtered_merged = merged_data.copy()
         filtered_electricity = electricity_data.copy()
         filtered_temp = temp_data.copy()
         
-        if selected_city != 'All':
-            filtered_static = filtered_static[filtered_static['City'] == selected_city]
+        if selected_city != 'Alle':
+            filtered_merged = filtered_merged[filtered_merged['City'] == selected_city]
             filtered_electricity = filtered_electricity[filtered_electricity['City'] == selected_city]
             filtered_temp = filtered_temp[filtered_temp['City'] == selected_city]
         
-        if selected_year != 'All':
+        if selected_year != 'Alle':
             filtered_electricity = filtered_electricity[filtered_electricity['Year'] == int(selected_year)]
         
-        if selected_project_type != 'All':
-            filtered_static = filtered_static[filtered_static['project_type'] == selected_project_type]
+        if selected_project != 'Alle':
+            filtered_merged = filtered_merged[filtered_merged['project_name'] == selected_project]
         
         # Main dashboard
         col1, col2, col3, col4 = st.columns(4)
         
         # Calculate KPIs
-        total_projects = len(filtered_static)
-        total_consumption = filtered_electricity['Year_total_KwH'].sum() if not filtered_electricity.empty else 0
-        avg_consumption_per_student = (
-            filtered_electricity['Year_total_KwH'].sum() / filtered_static['total_HE'].sum() 
-            if not filtered_static.empty and filtered_static['total_HE'].sum() > 0 else 0
-        )
-        avg_consumption_per_m2 = (
-            filtered_electricity['Year_total_KwH'].sum() / filtered_static['Total_BRA'].sum() 
-            if not filtered_static.empty and filtered_static['Total_BRA'].sum() > 0 else 0
-        )
+        total_projects = len(filtered_merged)
+        total_consumption = filtered_merged['Year_total_KwH'].sum() if not filtered_merged.empty else 0
+        total_students = filtered_merged['total_HE'].sum() if not filtered_merged.empty else 0
+        total_area = filtered_merged['Total_BRA'].sum() if not filtered_merged.empty else 0
+        
+        avg_consumption_per_student = total_consumption / total_students if total_students > 0 else 0
+        avg_consumption_per_m2 = total_consumption / total_area if total_area > 0 else 0
         
         with col1:
-            st.metric("Total Projects", f"{total_projects:,}")
+            st.metric("Totalt antall prosjekter", f"{total_projects:,}")
         
         with col2:
-            st.metric("Total Consumption", f"{total_consumption:,.0f} kWh")
+            st.metric("Totalt forbruk", f"{total_consumption:,.0f} kWh")
         
         with col3:
-            st.metric("kWh per Student", f"{avg_consumption_per_student:.1f}")
+            st.metric("kWh per student", f"{avg_consumption_per_student:.1f}")
         
         with col4:
             st.metric("kWh per m²", f"{avg_consumption_per_m2:.1f}")
         
         # Create tabs for different views
-        tab1, tab2, tab3, tab4 = st.tabs(["🗺️ Interactive Map", "📊 Energy Analytics", "🌡️ Temperature Analysis", "📈 Comparative Analysis"])
+        tab1, tab2, tab3, tab4 = st.tabs(["🗺️ Interaktivt kart", "📊 Energianalyse", "🌡️ Temperaturanalyse", "📈 Sammenligning"])
         
         with tab1:
-            st.subheader("Student Housing Projects Map")
+            st.subheader("Studentboliger - Interaktivt kart")
             
-            if not filtered_static.empty:
-                # Create map
-                folium_map = map_utils.create_energy_map(filtered_static, filtered_electricity)
+            if not filtered_merged.empty:
+                # Create map with selected color metric
+                folium_map = map_utils.create_energy_map(filtered_merged, color_metric)
                 st_folium(folium_map, width=700, height=500)
                 
-                # Map legend
-                st.markdown("""
-                **Map Legend:**
-                - 🔴 High consumption (>1M kWh/year)
-                - 🟡 Medium consumption (100k-1M kWh/year)
-                - 🟢 Low consumption (<100k kWh/year)
-                - ⚫ No consumption data available
-                """)
+                # Map legend based on selected metric
+                if color_metric == 'kwh_per_m2':
+                    st.markdown("""
+                    **Kartforklaring (kWh per m²):**
+                    - 🔴 Høyt forbruk (>50 kWh/m²)
+                    - 🟡 Middels forbruk (30-50 kWh/m²)
+                    - 🟢 Lavt forbruk (<30 kWh/m²)
+                    - ⚫ Ingen forbruksdata tilgjengelig
+                    """)
+                else:
+                    st.markdown("""
+                    **Kartforklaring (kWh per student):**
+                    - 🔴 Høyt forbruk (>4000 kWh/student)
+                    - 🟡 Middels forbruk (2000-4000 kWh/student)
+                    - 🟢 Lavt forbruk (<2000 kWh/student)
+                    - ⚫ Ingen forbruksdata tilgjengelig
+                    """)
             else:
-                st.warning("No data available for the selected filters.")
+                st.warning("Ingen data tilgjengelig for de valgte filtrene.")
         
         with tab2:
-            st.subheader("Energy Consumption Analytics")
+            st.subheader("Energiforbruksanalyse")
             
             if not filtered_electricity.empty:
                 # Monthly consumption trends
@@ -136,15 +160,15 @@ def main():
                     st.plotly_chart(top_consumers_chart, use_container_width=True)
                 
                 with col2:
-                    # Efficiency metrics
-                    if not filtered_static.empty:
-                        efficiency_chart = chart_utils.create_efficiency_chart(filtered_electricity, filtered_static)
+                    # Use merged data for efficiency chart
+                    if not filtered_merged.empty:
+                        efficiency_chart = chart_utils.create_efficiency_chart_from_merged(filtered_merged)
                         st.plotly_chart(efficiency_chart, use_container_width=True)
             else:
-                st.warning("No electricity consumption data available for the selected filters.")
+                st.warning("Ingen strømforbruksdata tilgjengelig for de valgte filtrene.")
         
         with tab3:
-            st.subheader("Temperature Correlation Analysis")
+            st.subheader("Temperaturanalyse")
             
             if not filtered_temp.empty and not filtered_electricity.empty:
                 # Temperature vs consumption correlation
@@ -154,51 +178,49 @@ def main():
                 st.plotly_chart(correlation_chart, use_container_width=True)
                 
                 # HDD analysis would go here if HDD data was available
-                st.info("Note: Heating Degree Days (HDD_17) analysis would be displayed here with additional temperature processing.")
+                st.info("Merk: Graddager (HDD_17) analyse ville blitt vist her med ytterligere temperaturbehandling.")
             else:
-                st.warning("Insufficient data for temperature correlation analysis.")
+                st.warning("Utilstrekkelige data for temperaturkorrelasjon analyse.")
         
         with tab4:
-            st.subheader("Comparative Analysis")
+            st.subheader("Sammenligning")
             
-            if not filtered_electricity.empty and not filtered_static.empty:
-                # Comparative metrics
-                comparison_data = chart_utils.prepare_comparison_data(filtered_electricity, filtered_static)
+            if not filtered_merged.empty:
+                # High vs Low consumption comparison
+                col1, col2 = st.columns(2)
                 
-                if not comparison_data.empty:
-                    # High vs Low consumption comparison
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        st.write("**High Consumption Properties (Top 25%)**")
-                        high_consumption = comparison_data.nlargest(max(1, len(comparison_data)//4), 'total_consumption')
-                        st.dataframe(high_consumption[['project_name', 'city', 'total_consumption', 'kwh_per_student', 'kwh_per_m2']])
-                    
-                    with col2:
-                        st.write("**Low Consumption Properties (Bottom 25%)**")
-                        low_consumption = comparison_data.nsmallest(max(1, len(comparison_data)//4), 'total_consumption')
-                        st.dataframe(low_consumption[['project_name', 'city', 'total_consumption', 'kwh_per_student', 'kwh_per_m2']])
-                    
-                    # Efficiency scatter plot
-                    efficiency_scatter = chart_utils.create_efficiency_scatter(comparison_data)
-                    st.plotly_chart(efficiency_scatter, use_container_width=True)
-                else:
-                    st.warning("Insufficient data for comparative analysis.")
+                with col1:
+                    st.write("**Høyt forbruk (Topp 25%)**")
+                    high_consumption = filtered_merged.nlargest(max(1, len(filtered_merged)//4), 'Year_total_KwH')
+                    st.dataframe(high_consumption[['project_name', 'City', 'Year_total_KwH', 'kwh_per_student', 'kwh_per_m2']])
+                
+                with col2:
+                    st.write("**Lavt forbruk (Bunn 25%)**")
+                    # Filter out projects with 0 consumption for bottom comparison
+                    filtered_for_low = filtered_merged[filtered_merged['Year_total_KwH'] > 0]
+                    if not filtered_for_low.empty:
+                        low_consumption = filtered_for_low.nsmallest(max(1, len(filtered_for_low)//4), 'Year_total_KwH')
+                        st.dataframe(low_consumption[['project_name', 'City', 'Year_total_KwH', 'kwh_per_student', 'kwh_per_m2']])
+                    else:
+                        st.write("Ingen data med forbruk > 0")
+                
+                # Efficiency scatter plot
+                efficiency_scatter = chart_utils.create_efficiency_scatter(filtered_merged)
+                st.plotly_chart(efficiency_scatter, use_container_width=True)
             else:
-                st.warning("Insufficient data for comparative analysis.")
+                st.warning("Utilstrekkelige data for sammenligning.")
         
         # Export functionality
         st.sidebar.markdown("---")
-        st.sidebar.subheader("📥 Export Data")
+        st.sidebar.subheader("📥 Eksporter data")
         
-        if st.sidebar.button("Download Analysis Results"):
-            # Prepare export data
-            export_data = chart_utils.prepare_export_data(filtered_electricity, filtered_static, filtered_temp)
-            csv = export_data.to_csv(index=False)
+        if st.sidebar.button("Last ned analyseresultater"):
+            # Prepare export data using merged data
+            csv = filtered_merged.to_csv(index=False)
             st.sidebar.download_button(
-                label="Download CSV",
+                label="Last ned CSV",
                 data=csv,
-                file_name=f"miljofyrtarn_analysis_{selected_city}_{selected_year}.csv",
+                file_name=f"miljofyrtarn_analyse_{selected_city}_{selected_year}.csv",
                 mime="text/csv"
             )
     

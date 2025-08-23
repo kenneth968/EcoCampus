@@ -7,16 +7,27 @@ class MapUtils:
         self.default_center = [63.4305, 10.3951]  # Trondheim coordinates
         self.zoom_start = 10
     
-    def get_consumption_color(self, consumption):
-        """Get color based on consumption level"""
-        if pd.isna(consumption) or consumption == 0:
+    def get_efficiency_color(self, efficiency_value, metric_type='kwh_per_m2'):
+        """Get color based on efficiency metric (kwh_per_m2 or kwh_per_student)"""
+        if pd.isna(efficiency_value) or efficiency_value == 0:
             return 'black'
-        elif consumption > 1000000:  # > 1M kWh
-            return 'red'
-        elif consumption > 100000:  # 100k - 1M kWh
-            return 'orange'
-        else:  # < 100k kWh
-            return 'green'
+        
+        if metric_type == 'kwh_per_m2':
+            # Color scale for kWh per m²
+            if efficiency_value > 50:  # High consumption per m²
+                return 'red'
+            elif efficiency_value > 30:  # Medium consumption per m²
+                return 'orange'
+            else:  # Low consumption per m²
+                return 'green'
+        else:  # kwh_per_student
+            # Color scale for kWh per student
+            if efficiency_value > 4000:  # High consumption per student
+                return 'red'
+            elif efficiency_value > 2000:  # Medium consumption per student
+                return 'orange'
+            else:  # Low consumption per student
+                return 'green'
     
     def get_consumption_size(self, consumption):
         """Get marker size based on consumption level"""
@@ -29,12 +40,12 @@ class MapUtils:
         else:
             return 7
     
-    def create_energy_map(self, static_df, electricity_df):
-        """Create an interactive map showing energy consumption"""
+    def create_energy_map(self, merged_df, color_metric='kwh_per_m2'):
+        """Create an interactive map showing energy efficiency"""
         # Calculate center based on available coordinates
-        if not static_df.empty and static_df['lat'].notna().any():
-            center_lat = static_df['lat'].mean()
-            center_lon = static_df['lon'].mean()
+        if not merged_df.empty and merged_df['lat'].notna().any():
+            center_lat = merged_df['lat'].mean()
+            center_lon = merged_df['lon'].mean()
         else:
             center_lat, center_lon = self.default_center
         
@@ -45,34 +56,38 @@ class MapUtils:
             tiles='OpenStreetMap'
         )
         
-        # Aggregate electricity data by project
-        consumption_by_project = electricity_df.groupby('project_name')['Year_total_KwH'].sum().to_dict()
-        
         # Add markers for each project
-        for idx, row in static_df.iterrows():
+        for idx, row in merged_df.iterrows():
             if pd.notna(row['lat']) and pd.notna(row['lon']):
                 project_name = row['project_name']
-                consumption = consumption_by_project.get(project_name, 0)
+                consumption = row['Year_total_KwH'] if pd.notna(row['Year_total_KwH']) else 0
+                students = row['total_HE'] if pd.notna(row['total_HE']) else 0
+                kwh_per_student = row['kwh_per_student'] if pd.notna(row['kwh_per_student']) else 0
+                kwh_per_m2 = row['kwh_per_m2'] if pd.notna(row['kwh_per_m2']) else 0
                 
-                # Create popup content
+                # Create popup content in Norwegian
                 popup_content = f"""
                 <b>{project_name}</b><br>
-                City: {row['City']}<br>
-                Type: {row['project_type']}<br>
-                Students: {row['total_HE'] if pd.notna(row['total_HE']) else 'N/A'}<br>
-                Area: {row['Total_BRA'] if pd.notna(row['Total_BRA']) else 'N/A'} m²<br>
-                Annual Consumption: {consumption:,.0f} kWh<br>
-                Built: {row['year_built'] if pd.notna(row['year_built']) else 'N/A'}
+                By: {row['City']}<br>
+                Studenter: {students:.0f}<br>
+                Årlig forbruk: {consumption:,.0f} kWh<br>
+                kWh per student: {kwh_per_student:.0f}<br>
+                kWh per m²: {kwh_per_m2:.1f}<br>
+                Byggeår: {row['year_built'] if pd.notna(row['year_built']) else 'N/A'}
                 """
+                
+                # Get color based on selected metric
+                efficiency_value = row[color_metric] if pd.notna(row[color_metric]) else 0
+                color = self.get_efficiency_color(efficiency_value, color_metric)
                 
                 # Add marker
                 folium.CircleMarker(
                     location=[row['lat'], row['lon']],
                     radius=self.get_consumption_size(consumption),
                     popup=folium.Popup(popup_content, max_width=300),
-                    color=self.get_consumption_color(consumption),
+                    color=color,
                     fill=True,
-                    fillColor=self.get_consumption_color(consumption),
+                    fillColor=color,
                     fillOpacity=0.7,
                     weight=2
                 ).add_to(m)

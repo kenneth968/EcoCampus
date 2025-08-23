@@ -33,6 +33,9 @@ class DataProcessor:
             file_path = os.path.join(self.data_dir, "static_data_1755935412803.csv")
             df = pd.read_csv(file_path)
             
+            # Filter only student housing projects
+            df = df[df['project_type'] == 'studentboliger']
+            
             # Clean numeric columns
             numeric_columns = ['year_built', 'lat', 'lon', 'total_HE', 'Total_BRA']
             for col in numeric_columns:
@@ -145,20 +148,28 @@ class DataProcessor:
             static_df, 
             consumption_summary, 
             on='project_name', 
-            how='left'
+            how='left',
+            suffixes=('', '_elec')
         )
+        
+        # Use the City column from static data and drop the duplicate
+        if 'City_elec' in merged_df.columns:
+            merged_df = merged_df.drop('City_elec', axis=1)
         
         # Calculate efficiency metrics
         merged_df['kwh_per_student'] = np.where(
-            merged_df['total_HE'] > 0,
+            (merged_df['total_HE'] > 0) & (merged_df['Year_total_KwH'].notna()),
             merged_df['Year_total_KwH'] / merged_df['total_HE'],
             0
         )
         
         merged_df['kwh_per_m2'] = np.where(
-            merged_df['Total_BRA'] > 0,
+            (merged_df['Total_BRA'] > 0) & (merged_df['Year_total_KwH'].notna()),
             merged_df['Year_total_KwH'] / merged_df['Total_BRA'],
             0
         )
+        
+        # Fill NaN values in consumption data with 0
+        merged_df['Year_total_KwH'] = merged_df['Year_total_KwH'].fillna(0)
         
         return merged_df
