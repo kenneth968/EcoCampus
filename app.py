@@ -48,16 +48,25 @@ def main():
         # Sidebar filters
         st.sidebar.header("🔍 Filter")
         
+        # Show all data toggle
+        show_all_data = st.sidebar.checkbox("📊 Vis all data samtidig", help="Vis all data for å identifisere unormalt høyt forbruk")
+        
         # Year filter (put first so it affects merged data)
-        years = ['Alle'] + sorted([str(year) for year in electricity_data['Year'].unique()])
-        selected_year = st.sidebar.radio("Velg år", years, horizontal=True)
+        if not show_all_data:
+            years = sorted([str(year) for year in electricity_data['Year'].unique()])
+            selected_year = st.sidebar.radio("Velg år", years, horizontal=True)
+        else:
+            selected_year = 'Alle'
         
         # Get merged data based on selected year
         merged_data = get_merged_data(processor, electricity_data, static_data, selected_year)
         
         # City filter
-        cities = ['Alle'] + sorted(merged_data['City'].dropna().unique().tolist())
-        selected_city = st.sidebar.radio("Velg by", cities)
+        if not show_all_data:
+            cities = sorted(merged_data['City'].dropna().unique().tolist())
+            selected_city = st.sidebar.radio("Velg by", cities)
+        else:
+            selected_city = 'Alle'
         
         # Filter merged data by city first
         if selected_city != 'Alle':
@@ -66,8 +75,11 @@ def main():
             city_filtered_data = merged_data
         
         # Project filter - only show projects from selected city
-        projects = ['Alle'] + sorted(city_filtered_data['project_name'].unique().tolist())
-        selected_project = st.sidebar.radio("Velg prosjekt", projects)
+        if not show_all_data:
+            projects = ['Alle'] + sorted(city_filtered_data['project_name'].unique().tolist())
+            selected_project = st.sidebar.selectbox("Velg prosjekt", projects)
+        else:
+            selected_project = 'Alle'
         
         # Map color metric toggle
         st.sidebar.markdown("---")
@@ -97,9 +109,14 @@ def main():
         
         if selected_year != 'Alle':
             filtered_electricity = filtered_electricity[filtered_electricity['Year'] == int(selected_year)]
+            filtered_temp = filtered_temp[filtered_temp['Year'] == int(selected_year)]
         
         if selected_project != 'Alle':
             filtered_merged = filtered_merged[filtered_merged['project_name'] == selected_project]
+            # Also filter temperature data by project location if specific project is selected
+            if not filtered_merged.empty:
+                project_city = filtered_merged['City'].iloc[0]
+                filtered_temp = filtered_temp[filtered_temp['City'] == project_city]
         
         # Main dashboard
         col1, col2, col3, col4 = st.columns(4)
