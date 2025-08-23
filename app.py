@@ -50,18 +50,24 @@ def main():
         
         # Year filter (put first so it affects merged data)
         years = ['Alle'] + sorted([str(year) for year in electricity_data['Year'].unique()])
-        selected_year = st.sidebar.selectbox("Velg år", years)
+        selected_year = st.sidebar.radio("Velg år", years, horizontal=True)
         
         # Get merged data based on selected year
         merged_data = get_merged_data(processor, electricity_data, static_data, selected_year)
         
         # City filter
         cities = ['Alle'] + sorted(merged_data['City'].dropna().unique().tolist())
-        selected_city = st.sidebar.selectbox("Velg by", cities)
+        selected_city = st.sidebar.radio("Velg by", cities)
         
-        # Project filter (instead of project type)
-        projects = ['Alle'] + sorted(merged_data['project_name'].unique().tolist())
-        selected_project = st.sidebar.selectbox("Velg prosjekt", projects)
+        # Filter merged data by city first
+        if selected_city != 'Alle':
+            city_filtered_data = merged_data[merged_data['City'] == selected_city]
+        else:
+            city_filtered_data = merged_data
+        
+        # Project filter - only show projects from selected city
+        projects = ['Alle'] + sorted(city_filtered_data['project_name'].unique().tolist())
+        selected_project = st.sidebar.radio("Velg prosjekt", projects)
         
         # Map color metric toggle
         st.sidebar.markdown("---")
@@ -73,12 +79,11 @@ def main():
         )
         
         # Filter data based on selections
-        filtered_merged = merged_data.copy()
+        filtered_merged = city_filtered_data.copy()  # Use already city-filtered data
         filtered_electricity = electricity_data.copy()
         filtered_temp = temp_data.copy()
         
         if selected_city != 'Alle':
-            filtered_merged = filtered_merged[filtered_merged['City'] == selected_city]
             filtered_electricity = filtered_electricity[filtered_electricity['City'] == selected_city]
             filtered_temp = filtered_temp[filtered_temp['City'] == selected_city]
         
