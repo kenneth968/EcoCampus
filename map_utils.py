@@ -70,8 +70,8 @@ class MapUtils:
                 <b>{project_name}</b><br>
                 By: {row['City']}<br>
                 Studenter: {students:.0f}<br>
-                Årlig forbruk: {consumption:,.0f} kWh<br>
-                kWh per student: {kwh_per_student:.0f}<br>
+                Årlig forbruk: {consumption:,.1f} kWh<br>
+                kWh per student: {kwh_per_student:.1f}<br>
                 kWh per m²: {kwh_per_m2:.1f}<br>
                 Byggeår: {row['year_built'] if pd.notna(row['year_built']) else 'N/A'}
                 """

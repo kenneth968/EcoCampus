@@ -135,13 +135,28 @@ class DataProcessor:
         
         return pd.DataFrame(monthly_data)
     
-    def merge_consumption_with_static(self, electricity_df, static_df):
+    def merge_consumption_with_static(self, electricity_df, static_df, selected_year=None):
         """Merge electricity consumption with static data for analysis"""
-        # Group electricity data by project and sum totals
-        consumption_summary = electricity_df.groupby('project_name').agg({
-            'Year_total_KwH': 'sum',
-            'City': 'first'
-        }).reset_index()
+        # Filter by year if specified
+        if selected_year and selected_year != 'Alle':
+            electricity_filtered = electricity_df[electricity_df['Year'] == int(selected_year)]
+        else:
+            # If no year specified or "Alle", group by project and sum all years
+            electricity_filtered = electricity_df
+        
+        # Group electricity data by project
+        if selected_year and selected_year != 'Alle':
+            # For specific year, just take the values (no summing needed)
+            consumption_summary = electricity_filtered.groupby('project_name').agg({
+                'Year_total_KwH': 'first',  # Use first since there should be only one row per project per year
+                'City': 'first'
+            }).reset_index()
+        else:
+            # For "Alle" years, sum across all years
+            consumption_summary = electricity_filtered.groupby('project_name').agg({
+                'Year_total_KwH': 'sum',
+                'City': 'first'
+            }).reset_index()
         
         # Merge with static data
         merged_df = pd.merge(

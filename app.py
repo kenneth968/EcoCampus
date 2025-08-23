@@ -23,15 +23,11 @@ st.set_page_config(
 def load_data():
     """Load and process all data files"""
     processor = DataProcessor()
-    data = processor.load_all_data()
-    # Merge consumption with static data for easier handling
-    merged_data = processor.merge_consumption_with_static(data['electricity'], data['static'])
-    return {
-        'temperature': data['temperature'],
-        'static': data['static'], 
-        'electricity': data['electricity'],
-        'merged': merged_data
-    }
+    return processor.load_all_data()
+
+def get_merged_data(processor, electricity_data, static_data, selected_year):
+    """Get merged data based on selected year"""
+    return processor.merge_consumption_with_static(electricity_data, static_data, selected_year)
 
 def main():
     st.title("🌿 Miljøfyrtårn Miljøledelsessystem")
@@ -43,22 +39,25 @@ def main():
         temp_data = data['temperature']
         static_data = data['static']
         electricity_data = data['electricity']
-        merged_data = data['merged']
         
         # Initialize utilities
         map_utils = MapUtils()
         chart_utils = ChartUtils()
+        processor = DataProcessor()
         
         # Sidebar filters
         st.sidebar.header("🔍 Filter")
         
+        # Year filter (put first so it affects merged data)
+        years = ['Alle'] + sorted([str(year) for year in electricity_data['Year'].unique()])
+        selected_year = st.sidebar.selectbox("Velg år", years)
+        
+        # Get merged data based on selected year
+        merged_data = get_merged_data(processor, electricity_data, static_data, selected_year)
+        
         # City filter
         cities = ['Alle'] + sorted(merged_data['City'].dropna().unique().tolist())
         selected_city = st.sidebar.selectbox("Velg by", cities)
-        
-        # Year filter
-        years = ['Alle'] + sorted([str(year) for year in electricity_data['Year'].unique()])
-        selected_year = st.sidebar.selectbox("Velg år", years)
         
         # Project filter (instead of project type)
         projects = ['Alle'] + sorted(merged_data['project_name'].unique().tolist())
