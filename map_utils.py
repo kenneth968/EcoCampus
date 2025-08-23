@@ -53,7 +53,7 @@ class MapUtils:
         else:
             return 7
     
-    def create_energy_map(self, merged_df, color_metric='kwh_per_m2'):
+    def create_energy_map(self, merged_df, color_metric='kwh_per_m2', global_min_max=None):
         """Create an interactive map showing energy efficiency"""
         # Calculate center based on available coordinates
         if not merged_df.empty and merged_df['lat'].notna().any():
@@ -69,13 +69,16 @@ class MapUtils:
             tiles='OpenStreetMap'
         )
         
-        # Calculate min and max values for the selected metric
-        valid_values = merged_df[merged_df[color_metric] > 0][color_metric]
-        if not valid_values.empty:
-            min_val = valid_values.min()
-            max_val = valid_values.max()
+        # Use global min/max if provided, otherwise calculate from current data
+        if global_min_max:
+            min_val, max_val = global_min_max
         else:
-            min_val = max_val = 0
+            valid_values = merged_df[merged_df[color_metric] > 0][color_metric]
+            if not valid_values.empty:
+                min_val = valid_values.min()
+                max_val = valid_values.max()
+            else:
+                min_val = max_val = 0
         
         # Add markers for each project
         for idx, row in merged_df.iterrows():

@@ -78,6 +78,14 @@ def main():
             format_func=lambda x: 'kWh per m²' if x == 'kwh_per_m2' else 'kWh per student'
         )
         
+        # Calculate global min/max for color scaling (from all data)
+        global_values = merged_data[merged_data[color_metric] > 0][color_metric]
+        if not global_values.empty:
+            global_min = global_values.min()
+            global_max = global_values.max()
+        else:
+            global_min = global_max = 0
+        
         # Filter data based on selections
         filtered_merged = city_filtered_data.copy()  # Use already city-filtered data
         filtered_electricity = electricity_data.copy()
@@ -124,19 +132,19 @@ def main():
             st.subheader("Studentboliger - Interaktivt kart")
             
             if not filtered_merged.empty:
-                # Create map with selected color metric
-                folium_map, min_val, max_val = map_utils.create_energy_map(filtered_merged, color_metric)
+                # Create map with selected color metric using global min/max
+                folium_map, _, _ = map_utils.create_energy_map(filtered_merged, color_metric, (global_min, global_max))
                 st_folium(folium_map, width=700, height=500)
                 
-                # Dynamic map legend based on actual data range
+                # Dynamic map legend based on global data range
                 metric_name = 'kWh per m²' if color_metric == 'kwh_per_m2' else 'kWh per student'
                 st.markdown(f"""
-                **Kartforklaring ({metric_name}):**
-                - 🟢 Lavt forbruk: {min_val:.1f} {metric_name}
-                - 🟡 Middels forbruk: {(min_val + max_val) / 2:.1f} {metric_name}
-                - 🔴 Høyt forbruk: {max_val:.1f} {metric_name}
+                **Kartforklaring ({metric_name}) - basert på alle prosjekter:**
+                - 🟢 Lavt forbruk: {global_min:.1f} {metric_name}
+                - 🟡 Middels forbruk: {(global_min + global_max) / 2:.1f} {metric_name}
+                - 🔴 Høyt forbruk: {global_max:.1f} {metric_name}
                 
-                Farger varierer gradvis fra grønn (lavest) til rød (høyest) basert på faktiske verdier.
+                Farger viser posisjon i forhold til alle prosjekter i datasettet.
                 """)
             else:
                 st.warning("Ingen data tilgjengelig for de valgte filtrene.")
