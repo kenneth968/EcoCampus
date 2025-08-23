@@ -10,4 +10,5 @@ dependencies = [
     "plotly>=6.3.0",
     "streamlit-folium>=0.25.1",
     "streamlit>=1.48.1",
+    "scipy>=1.16.1",
 ]

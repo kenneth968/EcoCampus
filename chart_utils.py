@@ -137,49 +137,217 @@ class ChartUtils:
             return fig
     
     def create_temperature_correlation_chart(self, temp_df, electricity_df):
-        """Create temperature vs consumption correlation chart"""
-        # This is a simplified correlation - in practice, you'd need to align dates properly
+        """Create comprehensive temperature and consumption correlation analysis"""
         try:
-            # Get monthly averages
-            monthly_temp = temp_df.groupby(['City', 'Time'])['Temperature'].mean().reset_index()
+            # Prepare monthly consumption data
+            monthly_consumption = self.prepare_monthly_consumption_data(electricity_df)
             
-            # Get electricity data by month (this would need proper date alignment)
-            monthly_columns = [col for col in electricity_df.columns if 'KwH' in col and col != 'Year_total_KwH']
+            # Create subplots with multiple charts
+            fig = make_subplots(
+                rows=2, cols=2,
+                subplot_titles=("Temperatur og Graddager", "Månedlig Strømforbruk", 
+                               "Graddager vs Forbruk", "Temperatur vs Forbruk"),
+                specs=[[{"secondary_y": True}, {"secondary_y": False}],
+                       [{"secondary_y": False}, {"secondary_y": False}]],
+                vertical_spacing=0.12
+            )
             
-            # Create a simplified correlation chart
-            fig = make_subplots(specs=[[{"secondary_y": True}]])
-            
-            # Add temperature line
+            # Chart 1: Temperature and Degree Days over time
             cities = temp_df['City'].unique()
             for city in cities:
-                city_temp = monthly_temp[monthly_temp['City'] == city]
+                city_temp = temp_df[temp_df['City'] == city].copy()
                 if not city_temp.empty:
+                    # Sort by year and month for proper time series
+                    city_temp = city_temp.sort_values(['Year', 'Month'])
+                    
+                    # Add temperature line
                     fig.add_trace(
                         go.Scatter(
                             x=city_temp['Time'],
                             y=city_temp['Temperature'],
-                            name=f"{city} Temperature",
-                            line=dict(color=self.color_palette['secondary'])
+                            name=f"{city} Temperatur",
+                            line=dict(color='blue', width=2),
+                            legendgroup=city
                         ),
-                        secondary_y=False
+                        row=1, col=1, secondary_y=False
+                    )
+                    
+                    # Add degree days line
+                    fig.add_trace(
+                        go.Scatter(
+                            x=city_temp['Time'],
+                            y=city_temp['Monthly_HDD'],
+                            name=f"{city} Graddager",
+                            line=dict(color='red', width=2, dash='dash'),
+                            legendgroup=city
+                        ),
+                        row=1, col=1, secondary_y=True
                     )
             
-            fig.update_xaxes(title_text="Time Period")
-            fig.update_yaxes(title_text="Temperature (°C)", secondary_y=False)
-            fig.update_layout(title="Temperature Trends by City")
+            # Chart 2: Monthly consumption trends
+            if not monthly_consumption.empty:
+                fig.add_trace(
+                    go.Bar(
+                        x=monthly_consumption['Month'],
+                        y=monthly_consumption['Total_Consumption'],
+                        name="Totalt Forbruk",
+                        marker_color='green',
+                        opacity=0.7
+                    ),
+                    row=1, col=2
+                )
+            
+            # Chart 3: Degree Days vs Consumption scatter
+            correlation_data = self.merge_temp_consumption_data(temp_df, electricity_df)
+            if not correlation_data.empty:
+                fig.add_trace(
+                    go.Scatter(
+                        x=correlation_data['Monthly_HDD'],
+                        y=correlation_data['Monthly_Consumption'],
+                        mode='markers',
+                        name="Graddager vs Forbruk",
+                        marker=dict(
+                            size=8,
+                            color=correlation_data['Temperature'],
+                            colorscale='RdYlBu_r',
+                            showscale=True,
+                            colorbar=dict(title="Temp (°C)", x=1.1)
+                        ),
+                        text=correlation_data['Time'],
+                        hovertemplate="<b>%{text}</b><br>" +
+                                     "Graddager: %{x:.0f}<br>" +
+                                     "Forbruk: %{y:,.0f} kWh<br>" +
+                                     "Temperatur: %{marker.color:.1f}°C<extra></extra>"
+                    ),
+                    row=2, col=1
+                )
+            
+            # Chart 4: Temperature vs Consumption scatter
+            if not correlation_data.empty:
+                fig.add_trace(
+                    go.Scatter(
+                        x=correlation_data['Temperature'],
+                        y=correlation_data['Monthly_Consumption'],
+                        mode='markers',
+                        name="Temperatur vs Forbruk",
+                        marker=dict(
+                            size=10,
+                            color='orange',
+                            opacity=0.7
+                        ),
+                        text=correlation_data['Time'],
+                        hovertemplate="<b>%{text}</b><br>" +
+                                     "Temperatur: %{x:.1f}°C<br>" +
+                                     "Forbruk: %{y:,.0f} kWh<extra></extra>"
+                    ),
+                    row=2, col=2
+                )
+            
+            # Update layout
+            fig.update_layout(
+                title="Temperatur og Energiforbruk Analyse",
+                height=800,
+                showlegend=True,
+                legend=dict(x=1.05, y=1)
+            )
+            
+            # Update axes labels
+            fig.update_xaxes(title_text="Tid", row=1, col=1)
+            fig.update_yaxes(title_text="Temperatur (°C)", row=1, col=1, secondary_y=False)
+            fig.update_yaxes(title_text="Graddager", row=1, col=1, secondary_y=True, color='red')
+            
+            fig.update_xaxes(title_text="Måned", row=1, col=2)
+            fig.update_yaxes(title_text="Forbruk (kWh)", row=1, col=2)
+            
+            fig.update_xaxes(title_text="Graddager", row=2, col=1)
+            fig.update_yaxes(title_text="Forbruk (kWh)", row=2, col=1)
+            
+            fig.update_xaxes(title_text="Temperatur (°C)", row=2, col=2)
+            fig.update_yaxes(title_text="Forbruk (kWh)", row=2, col=2)
             
             return fig
             
         except Exception as e:
             fig = go.Figure()
             fig.add_annotation(
-                text=f"Error creating correlation chart: {str(e)}",
+                text=f"Feil ved oppretting av temperaturanalyse: {str(e)}",
                 xref="paper", yref="paper",
                 x=0.5, y=0.5, xanchor='center', yanchor='middle',
                 showarrow=False, font_size=14
             )
-            fig.update_layout(title='Temperature vs Consumption Correlation')
+            fig.update_layout(title='Temperatur og Forbruk Korrelasjon')
             return fig
+    
+    def prepare_monthly_consumption_data(self, electricity_df):
+        """Prepare monthly consumption data for analysis"""
+        try:
+            monthly_columns = [col for col in electricity_df.columns if 'KwH' in col and col != 'Year_total_KwH']
+            monthly_data = []
+            
+            month_map = {
+                'Jan_KwH': 'Januar', 'Feb_KwH': 'Februar', 'Mar_KwH': 'Mars',
+                'Apr__KwH': 'April', 'may__KwH': 'Mai', 'Jun_KwH': 'Juni',
+                'Jul_KwH': 'Juli', 'Aug_KwH': 'August', 'Sep_KwH': 'September',
+                'Oct_KwH': 'Oktober', 'Nov_KwH': 'November', 'Dec_KwH': 'Desember'
+            }
+            
+            for col in monthly_columns:
+                month_name = month_map.get(col, col.replace('_KwH', '').replace('__KwH', ''))
+                total = electricity_df[col].sum()
+                monthly_data.append({
+                    'Month': month_name,
+                    'Total_Consumption': total
+                })
+            
+            return pd.DataFrame(monthly_data)
+        except:
+            return pd.DataFrame()
+    
+    def merge_temp_consumption_data(self, temp_df, electricity_df):
+        """Merge temperature and consumption data for correlation analysis"""
+        try:
+            # Get monthly consumption by city and month
+            monthly_columns = [col for col in electricity_df.columns if 'KwH' in col and col != 'Year_total_KwH']
+            
+            correlation_data = []
+            
+            for _, temp_row in temp_df.iterrows():
+                city = temp_row['City']
+                year = temp_row['Year']
+                month = temp_row['Month']
+                
+                # Find matching electricity data
+                city_elec = electricity_df[
+                    (electricity_df['City'] == city) & 
+                    (electricity_df['Year'] == year)
+                ]
+                
+                if not city_elec.empty:
+                    # Map month number to consumption column
+                    month_col_map = {
+                        1: 'Jan_KwH', 2: 'Feb_KwH', 3: 'Mar_KwH', 4: 'Apr__KwH',
+                        5: 'may__KwH', 6: 'Jun_KwH', 7: 'Jul_KwH', 8: 'Aug_KwH',
+                        9: 'Sep_KwH', 10: 'Oct_KwH', 11: 'Nov_KwH', 12: 'Dec_KwH'
+                    }
+                    
+                    consumption_col = month_col_map.get(month)
+                    if consumption_col and consumption_col in city_elec.columns:
+                        monthly_consumption = city_elec[consumption_col].sum()
+                        
+                        correlation_data.append({
+                            'City': city,
+                            'Year': year,
+                            'Month': month,
+                            'Time': temp_row['Time'],
+                            'Temperature': temp_row['Temperature'],
+                            'HDD_17': temp_row['HDD_17'],
+                            'Monthly_HDD': temp_row['Monthly_HDD'],
+                            'Monthly_Consumption': monthly_consumption
+                        })
+            
+            return pd.DataFrame(correlation_data)
+        except:
+            return pd.DataFrame()
     
     def prepare_comparison_data(self, electricity_df, static_df):
         """Prepare data for comparative analysis"""

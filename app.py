@@ -173,19 +173,45 @@ def main():
                 st.warning("Ingen strømforbruksdata tilgjengelig for de valgte filtrene.")
         
         with tab3:
-            st.subheader("Temperaturanalyse")
+            st.subheader("Temperatur og Graddager Analyse")
             
             if not filtered_temp.empty and not filtered_electricity.empty:
-                # Temperature vs consumption correlation
+                # Enhanced temperature vs consumption correlation with degree days
                 correlation_chart = chart_utils.create_temperature_correlation_chart(
                     filtered_temp, filtered_electricity
                 )
                 st.plotly_chart(correlation_chart, use_container_width=True)
                 
-                # HDD analysis would go here if HDD data was available
-                st.info("Merk: Graddager (HDD_17) analyse ville blitt vist her med ytterligere temperaturbehandling.")
+                # Explanation of degree days
+                st.info("""
+                **Graddager (HDD_17):** Mål på oppvarmingsbehov basert på temperatur under 17°C. 
+                Høyere graddager = kaldere vær = mer oppvarmingsbehov = høyere strømforbruk.
+                """)
+                
+                # Show correlation statistics if available
+                correlation_data = chart_utils.merge_temp_consumption_data(filtered_temp, filtered_electricity)
+                if not correlation_data.empty and len(correlation_data) > 1:
+                    import scipy.stats as stats
+                    
+                    # Calculate correlations
+                    temp_corr = stats.pearsonr(correlation_data['Temperature'], correlation_data['Monthly_Consumption'])
+                    hdd_corr = stats.pearsonr(correlation_data['Monthly_HDD'], correlation_data['Monthly_Consumption'])
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric(
+                            "Korrelasjon: Temperatur vs Forbruk", 
+                            f"{temp_corr[0]:.3f}",
+                            help="Negativ verdi = lavere temperatur gir høyere forbruk"
+                        )
+                    with col2:
+                        st.metric(
+                            "Korrelasjon: Graddager vs Forbruk", 
+                            f"{hdd_corr[0]:.3f}",
+                            help="Positiv verdi = flere graddager gir høyere forbruk"
+                        )
             else:
-                st.warning("Utilstrekkelige data for temperaturkorrelasjon analyse.")
+                st.warning("Utilstrekkelige data for temperaturanalyse.")
         
         with tab4:
             st.subheader("Sammenligning")

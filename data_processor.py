@@ -8,7 +8,7 @@ class DataProcessor:
         self.data_dir = "attached_assets"
     
     def load_temperature_data(self):
-        """Load and process temperature data"""
+        """Load and process temperature data with degree days calculation"""
         try:
             file_path = os.path.join(self.data_dir, "temperature_data_1755935412803.csv")
             df = pd.read_csv(file_path)
@@ -19,6 +19,23 @@ class DataProcessor:
             # Parse time column to create proper date
             df['Month_Year'] = df['Time'].str.replace('.', '/20')  # Convert aug.20 to aug/2020
             
+            # Create proper date columns
+            month_map = {
+                'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'mai': 5, 'jun': 6,
+                'jul': 7, 'aug': 8, 'sep': 9, 'okt': 10, 'nov': 11, 'des': 12
+            }
+            
+            df['Month'] = df['Time'].str[:3].map(month_map)
+            df['Year'] = df['Time'].str[4:].astype(int) + 2000
+            
+            # Calculate heating degree days (HDD) with base temperature 17°C
+            base_temp = 17.0
+            df['HDD_17'] = np.maximum(0, base_temp - df['Temperature'])
+            
+            # Calculate days in month for proper HDD calculation
+            df['Days_in_Month'] = df.apply(lambda row: self.get_days_in_month(row['Month'], row['Year']), axis=1)
+            df['Monthly_HDD'] = df['HDD_17'] * df['Days_in_Month']
+            
             # Standardize city names to match other datasets
             if 'City' in df.columns:
                 df['City'] = df['City'].str.upper().str.strip()
@@ -26,6 +43,11 @@ class DataProcessor:
             return df
         except Exception as e:
             raise Exception(f"Error loading temperature data: {str(e)}")
+    
+    def get_days_in_month(self, month, year):
+        """Get number of days in a given month and year"""
+        import calendar
+        return calendar.monthrange(year, month)[1]
     
     def load_static_data(self):
         """Load and process static project data"""
