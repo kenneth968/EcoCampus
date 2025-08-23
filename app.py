@@ -120,26 +120,19 @@ def main():
             
             if not filtered_merged.empty:
                 # Create map with selected color metric
-                folium_map = map_utils.create_energy_map(filtered_merged, color_metric)
+                folium_map, min_val, max_val = map_utils.create_energy_map(filtered_merged, color_metric)
                 st_folium(folium_map, width=700, height=500)
                 
-                # Map legend based on selected metric
-                if color_metric == 'kwh_per_m2':
-                    st.markdown("""
-                    **Kartforklaring (kWh per m²):**
-                    - 🔴 Høyt forbruk (>50 kWh/m²)
-                    - 🟡 Middels forbruk (30-50 kWh/m²)
-                    - 🟢 Lavt forbruk (<30 kWh/m²)
-                    - ⚫ Ingen forbruksdata tilgjengelig
-                    """)
-                else:
-                    st.markdown("""
-                    **Kartforklaring (kWh per student):**
-                    - 🔴 Høyt forbruk (>4000 kWh/student)
-                    - 🟡 Middels forbruk (2000-4000 kWh/student)
-                    - 🟢 Lavt forbruk (<2000 kWh/student)
-                    - ⚫ Ingen forbruksdata tilgjengelig
-                    """)
+                # Dynamic map legend based on actual data range
+                metric_name = 'kWh per m²' if color_metric == 'kwh_per_m2' else 'kWh per student'
+                st.markdown(f"""
+                **Kartforklaring ({metric_name}):**
+                - 🟢 Lavt forbruk: {min_val:.1f} {metric_name}
+                - 🟡 Middels forbruk: {(min_val + max_val) / 2:.1f} {metric_name}
+                - 🔴 Høyt forbruk: {max_val:.1f} {metric_name}
+                
+                Farger varierer gradvis fra grønn (lavest) til rød (høyest) basert på faktiske verdier.
+                """)
             else:
                 st.warning("Ingen data tilgjengelig for de valgte filtrene.")
         

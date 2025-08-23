@@ -7,27 +7,40 @@ class MapUtils:
         self.default_center = [63.4305, 10.3951]  # Trondheim coordinates
         self.zoom_start = 10
     
-    def get_efficiency_color(self, efficiency_value, metric_type='kwh_per_m2'):
-        """Get color based on efficiency metric (kwh_per_m2 or kwh_per_student)"""
+    def get_efficiency_color_gradient(self, efficiency_value, min_val, max_val):
+        """Get color based on efficiency metric using continuous gradient from green to red"""
         if pd.isna(efficiency_value) or efficiency_value == 0:
             return 'black'
         
-        if metric_type == 'kwh_per_m2':
-            # Color scale for kWh per m²
-            if efficiency_value > 50:  # High consumption per m²
-                return 'red'
-            elif efficiency_value > 30:  # Medium consumption per m²
-                return 'orange'
-            else:  # Low consumption per m²
-                return 'green'
-        else:  # kwh_per_student
-            # Color scale for kWh per student
-            if efficiency_value > 4000:  # High consumption per student
-                return 'red'
-            elif efficiency_value > 2000:  # Medium consumption per student
-                return 'orange'
-            else:  # Low consumption per student
-                return 'green'
+        if min_val >= max_val:
+            return 'green'  # Default if no variation
+        
+        # Normalize value to 0-1 scale
+        normalized = (efficiency_value - min_val) / (max_val - min_val)
+        normalized = max(0, min(1, normalized))  # Clamp to 0-1
+        
+        # Create gradient from green (low) to red (high)
+        # Green to Yellow to Orange to Red
+        if normalized <= 0.33:
+            # Green to Yellow
+            factor = normalized / 0.33
+            r = int(factor * 255)
+            g = 255
+            b = 0
+        elif normalized <= 0.66:
+            # Yellow to Orange
+            factor = (normalized - 0.33) / 0.33
+            r = 255
+            g = int(255 * (1 - factor * 0.5))  # Fade from 255 to 128
+            b = 0
+        else:
+            # Orange to Red
+            factor = (normalized - 0.66) / 0.34
+            r = 255
+            g = int(128 * (1 - factor))  # Fade from 128 to 0
+            b = 0
+        
+        return f'#{r:02x}{g:02x}{b:02x}'
     
     def get_consumption_size(self, consumption):
         """Get marker size based on consumption level"""
@@ -56,6 +69,14 @@ class MapUtils:
             tiles='OpenStreetMap'
         )
         
+        # Calculate min and max values for the selected metric
+        valid_values = merged_df[merged_df[color_metric] > 0][color_metric]
+        if not valid_values.empty:
+            min_val = valid_values.min()
+            max_val = valid_values.max()
+        else:
+            min_val = max_val = 0
+        
         # Add markers for each project
         for idx, row in merged_df.iterrows():
             if pd.notna(row['lat']) and pd.notna(row['lon']):
@@ -76,9 +97,9 @@ class MapUtils:
                 Byggeår: {row['year_built'] if pd.notna(row['year_built']) else 'N/A'}
                 """
                 
-                # Get color based on selected metric
+                # Get color based on selected metric using gradient
                 efficiency_value = row[color_metric] if pd.notna(row[color_metric]) else 0
-                color = self.get_efficiency_color(efficiency_value, color_metric)
+                color = self.get_efficiency_color_gradient(efficiency_value, min_val, max_val)
                 
                 # Add marker
                 folium.CircleMarker(
@@ -92,7 +113,7 @@ class MapUtils:
                     weight=2
                 ).add_to(m)
         
-        return m
+        return m, min_val, max_val
     
     def create_city_overview_map(self, static_df, electricity_df):
         """Create a map showing city-level consumption overview"""

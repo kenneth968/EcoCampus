@@ -187,4 +187,7 @@ class DataProcessor:
         # Fill NaN values in consumption data with 0
         merged_df['Year_total_KwH'] = merged_df['Year_total_KwH'].fillna(0)
         
+        # Filter out projects with no consumption data
+        merged_df = merged_df[merged_df['Year_total_KwH'] > 0]
+        
         return merged_df
