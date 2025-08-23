@@ -194,43 +194,51 @@ class ChartUtils:
         
         return comparison_df[['project_name', 'city', 'total_consumption', 'kwh_per_student', 'kwh_per_m2']].dropna()
     
-    def create_efficiency_scatter(self, comparison_df):
+    def create_efficiency_scatter(self, merged_df):
         """Create efficiency scatter plot"""
-        if not comparison_df.empty:
+        # Filter for valid data
+        scatter_df = merged_df[
+            (merged_df['Year_total_KwH'] > 0) & 
+            (merged_df['kwh_per_m2'] > 0) & 
+            (merged_df['kwh_per_student'] > 0)
+        ].copy()
+        
+        if not scatter_df.empty:
             fig = px.scatter(
-                comparison_df,
+                scatter_df,
                 x='kwh_per_m2',
                 y='kwh_per_student',
-                size='total_consumption',
-                color='city',
+                size='Year_total_KwH',
+                color='City',
                 hover_data=['project_name'],
-                title='Energy Efficiency: kWh per Student vs kWh per m²',
+                title='Energieffektivitet: kWh per Student vs kWh per m²',
                 labels={
                     'kwh_per_m2': 'kWh per m²',
-                    'kwh_per_student': 'kWh per Student'
+                    'kwh_per_student': 'kWh per Student',
+                    'Year_total_KwH': 'Totalt Forbruk'
                 }
             )
             
             # Add quadrant lines
-            if comparison_df['kwh_per_m2'].notna().any() and comparison_df['kwh_per_student'].notna().any():
-                avg_per_m2 = comparison_df['kwh_per_m2'].mean()
-                avg_per_student = comparison_df['kwh_per_student'].mean()
+            if scatter_df['kwh_per_m2'].notna().any() and scatter_df['kwh_per_student'].notna().any():
+                avg_per_m2 = scatter_df['kwh_per_m2'].mean()
+                avg_per_student = scatter_df['kwh_per_student'].mean()
                 
                 fig.add_hline(y=avg_per_student, line_dash="dash", line_color="gray", 
-                             annotation_text="Avg kWh/student")
+                             annotation_text="Snitt kWh/student")
                 fig.add_vline(x=avg_per_m2, line_dash="dash", line_color="gray", 
-                             annotation_text="Avg kWh/m²")
+                             annotation_text="Snitt kWh/m²")
             
             return fig
         else:
             fig = go.Figure()
             fig.add_annotation(
-                text="No data available for efficiency comparison",
+                text="Ingen data tilgjengelig for effektivitetssammenligning",
                 xref="paper", yref="paper",
                 x=0.5, y=0.5, xanchor='center', yanchor='middle',
                 showarrow=False, font_size=16
             )
-            fig.update_layout(title='Energy Efficiency Comparison')
+            fig.update_layout(title='Energieffektivitetssammenligning')
             return fig
     
     def prepare_export_data(self, electricity_df, static_df, temp_df):
