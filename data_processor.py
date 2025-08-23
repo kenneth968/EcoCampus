@@ -19,6 +19,10 @@ class DataProcessor:
             # Parse time column to create proper date
             df['Month_Year'] = df['Time'].str.replace('.', '/20')  # Convert aug.20 to aug/2020
             
+            # Standardize city names to match other datasets
+            if 'City' in df.columns:
+                df['City'] = df['City'].str.upper().str.strip()
+            
             return df
         except Exception as e:
             raise Exception(f"Error loading temperature data: {str(e)}")
@@ -35,7 +39,32 @@ class DataProcessor:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors='coerce')
             
-            # Remove rows without coordinates for mapping
+            # Standardize city column name to match electricity data
+            if 'city' in df.columns:
+                df = df.rename(columns={'city': 'City'})
+            
+            # Clean city names to match electricity data format
+            if 'City' in df.columns:
+                df['City'] = df['City'].str.upper().str.strip()
+            
+            # Add approximate coordinates for properties missing them
+            city_coordinates = {
+                'ÅLESUND': (62.4722, 6.1495),
+                'GJØVIK': (60.7957, 10.6915),
+                'TRONDHEIM': (63.4305, 10.3951)
+            }
+            
+            for idx, row in df.iterrows():
+                if pd.isna(row['lat']) or pd.isna(row['lon']):
+                    city = row['City']
+                    if city in city_coordinates:
+                        # Add small random offset to avoid exact overlap
+                        base_lat, base_lon = city_coordinates[city]
+                        offset = (idx % 10) * 0.001  # Small offset based on row index
+                        df.at[idx, 'lat'] = base_lat + offset
+                        df.at[idx, 'lon'] = base_lon + offset
+            
+            # Remove rows that still don't have coordinates
             df_with_coords = df.dropna(subset=['lat', 'lon'])
             
             return df_with_coords
@@ -60,6 +89,15 @@ class DataProcessor:
             
             # Clean city names
             df['City'] = df['City'].str.upper().str.strip()
+            
+            # Fix city name mappings to match static data
+            city_mapping = {
+                'JAKOBSLI': 'TRONDHEIM',  # Jakobsliveien 55 is actually in Trondheim
+                'ÅLESUND': 'ÅLESUND',
+                'GJØVIK': 'GJØVIK',
+                'TRONDHEIM': 'TRONDHEIM'
+            }
+            df['City'] = df['City'].map(city_mapping).fillna(df['City'])
             
             # Rename columns for consistency
             if 'project_name' in df.columns:
