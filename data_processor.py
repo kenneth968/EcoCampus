@@ -99,9 +99,23 @@ class DataProcessor:
     def load_electricity_data(self):
         """Load and process electricity consumption data"""
         try:
-            file_path = os.path.join(self.data_dir, "Electricity_data_1755935412803.csv")
-            # Use semicolon separator and handle encoding
-            df = pd.read_csv(file_path, sep=';', encoding='utf-8-sig')
+            # Look for electricity files (new or old)
+            import glob
+            electricity_files = glob.glob(os.path.join(self.data_dir, "*electricity*.csv")) + \
+                               glob.glob(os.path.join(self.data_dir, "*Electricity*.csv"))
+            
+            if not electricity_files:
+                # Fallback to original file
+                file_path = os.path.join(self.data_dir, "Electricity_data_1755935412803.csv")
+            else:
+                # Use the most recent file
+                file_path = max(electricity_files, key=os.path.getmtime)
+            
+            # Try comma separator first (new format), then semicolon (old format)
+            try:
+                df = pd.read_csv(file_path, sep=',', encoding='utf-8-sig')
+            except:
+                df = pd.read_csv(file_path, sep=';', encoding='utf-8-sig')
             
             # Clean column names
             df.columns = df.columns.str.strip()
