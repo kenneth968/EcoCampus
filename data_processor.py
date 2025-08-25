@@ -52,7 +52,7 @@ class DataProcessor:
     def load_static_data(self):
         """Load and process static project data"""
         try:
-            file_path = os.path.join(self.data_dir, "static_data_1755935412803.csv")
+            file_path = os.path.join(self.data_dir, "static_data_updated_1756108797611.csv")
             df = pd.read_csv(file_path)
             
             # Filter only student housing projects
