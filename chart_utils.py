@@ -237,7 +237,7 @@ class ChartUtils:
                             color=correlation_data['Temperature'],
                             colorscale='RdYlBu_r',
                             showscale=True,
-                            colorbar=dict(title="Temp (°C)", x=1.1)
+                            colorbar=dict(title="Temp (°C)", x=1.1, len=0.5)
                         ),
                         text=correlation_data['Time'],
                         hovertemplate="<b>%{text}</b><br>" +

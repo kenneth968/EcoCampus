@@ -264,7 +264,8 @@ def main():
                 "Prosjekter for sammenligning:",
                 available_projects,
                 default=st.session_state.comparison_projects,
-                key="comparison_selector"
+                key="comparison_selector",
+                placeholder="Velg prosjekter..."
             )
             st.session_state.comparison_projects = comparison_projects
             
@@ -279,9 +280,13 @@ def main():
                     st.write(f"**Sammenligning av {len(comparison_projects)} prosjekt(er):**")
                     comparison_table = comparison_data[[
                         'project_name', 'City', 'Year_total_KwH', 
-                        'kwh_per_student', 'kwh_per_m2', 'total_HE', 'Total_BRA'
-                    ]].round(1)
-                    st.dataframe(comparison_table, use_container_width=True)
+                        'kwh_per_student', 'kwh_per_m2'
+                    ]].round(1).copy()
+                    
+                    # Rename columns to Norwegian
+                    comparison_table.columns = ['Studentby', 'By', 'Årlig kWh', 'kWh per student', 'kWh per m²']
+                    
+                    st.dataframe(comparison_table, use_container_width=True, hide_index=True)
                     
                     # Comparison charts side by side
                     col1, col2 = st.columns(2)
