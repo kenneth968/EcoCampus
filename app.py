@@ -53,7 +53,8 @@ def main():
         
         # Year filter (put first so it affects merged data)
         if not show_all_data:
-            years = sorted([str(year) for year in electricity_data['Year'].unique()])
+            # Filter out 2020 as it's incomplete
+            years = sorted([str(year) for year in electricity_data['Year'].unique() if year != 2020])
             selected_year = st.sidebar.radio("Velg år", years, horizontal=True)
         else:
             selected_year = 'Alle'
@@ -197,7 +198,7 @@ def main():
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    top_consumers_chart = chart_utils.create_top_consumers_chart(filtered_electricity)
+                    top_consumers_chart = chart_utils.create_top_consumers_chart(filtered_merged)
                     st.plotly_chart(top_consumers_chart, use_container_width=True)
                 
                 with col2:
@@ -282,9 +283,14 @@ def main():
                     ]].round(1)
                     st.dataframe(comparison_table, use_container_width=True)
                     
-                    # Comparison chart
-                    comparison_chart = chart_utils.create_project_comparison_chart(comparison_data)
-                    st.plotly_chart(comparison_chart, use_container_width=True)
+                    # Comparison charts side by side
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        comparison_chart_student = chart_utils.create_project_comparison_chart_student(comparison_data)
+                        st.plotly_chart(comparison_chart_student, use_container_width=True)
+                    with col2:
+                        comparison_chart_m2 = chart_utils.create_project_comparison_chart_m2(comparison_data)
+                        st.plotly_chart(comparison_chart_m2, use_container_width=True)
                 else:
                     st.warning("Ingen data tilgjengelig for de valgte prosjektene.")
             else:

@@ -42,13 +42,13 @@ class ChartUtils:
                 x='Month', 
                 y='Total_KwH', 
                 color='Year',
-                title='Monthly Energy Consumption Trends',
-                labels={'Total_KwH': 'Total Consumption (kWh)', 'Month': 'Month'}
+                title='Månedlige Energiforbrukstrender',
+                labels={'Total_KwH': 'Totalt Forbruk (kWh)', 'Month': 'Måned', 'Year': 'År'}
             )
             
             fig.update_layout(
-                xaxis_title='Month',
-                yaxis_title='Total Consumption (kWh)',
+                xaxis_title='Måned',
+                yaxis_title='Totalt Forbruk (kWh)',
                 hovermode='x unified'
             )
             
@@ -57,70 +57,96 @@ class ChartUtils:
             # Return empty chart
             fig = go.Figure()
             fig.add_annotation(
-                text="No data available",
+                text="Ingen data tilgjengelig",
                 xref="paper", yref="paper",
                 x=0.5, y=0.5, xanchor='center', yanchor='middle',
                 showarrow=False, font_size=16
             )
-            fig.update_layout(title='Monthly Energy Consumption Trends')
+            fig.update_layout(title='Månedlige Energiforbrukstrender')
             return fig
     
-    def create_top_consumers_chart(self, electricity_df):
-        """Create top consumers bar chart"""
-        # Group by project and sum annual consumption
-        project_consumption = electricity_df.groupby('project_name')['Year_total_KwH'].sum().reset_index()
-        project_consumption = project_consumption.sort_values('Year_total_KwH', ascending=False).head(10)
+    def create_top_consumers_chart(self, merged_df):
+        """Create top 5 consumers chart with efficiency metrics"""
+        # Filter valid data and get top 5
+        valid_data = merged_df[
+            (merged_df['Year_total_KwH'] > 0) & 
+            (merged_df['kwh_per_student'] > 0) & 
+            (merged_df['kwh_per_m2'] > 0)
+        ].copy()
         
-        fig = px.bar(
-            project_consumption,
-            x='Year_total_KwH',
-            y='project_name',
-            orientation='h',
-            title='Top 10 Energy Consumers',
-            labels={'Year_total_KwH': 'Annual Consumption (kWh)', 'project_name': 'Project'},
-            color='Year_total_KwH',
-            color_continuous_scale='Reds'
-        )
+        if valid_data.empty:
+            fig = go.Figure()
+            fig.add_annotation(
+                text="Ingen data tilgjengelig",
+                xref="paper", yref="paper",
+                x=0.5, y=0.5, xanchor='center', yanchor='middle',
+                showarrow=False, font_size=16
+            )
+            fig.update_layout(title='Topp 5 Høyeste Forbrukere')
+            return fig
+            
+        top_consumers = valid_data.nlargest(5, 'Year_total_KwH')
+        
+        fig = go.Figure()
+        
+        # Add kWh per student bars
+        fig.add_trace(go.Bar(
+            name='kWh per student',
+            x=top_consumers['project_name'],
+            y=top_consumers['kwh_per_student'],
+            marker_color='lightblue',
+            text=top_consumers['kwh_per_student'].round(0),
+            textposition='auto',
+        ))
+        
+        # Add kWh per m² bars
+        fig.add_trace(go.Bar(
+            name='kWh per m²',
+            x=top_consumers['project_name'],
+            y=top_consumers['kwh_per_m2'],
+            marker_color='lightcoral',
+            text=top_consumers['kwh_per_m2'].round(0),
+            textposition='auto',
+            opacity=0.7
+        ))
         
         fig.update_layout(
-            yaxis={'categoryorder': 'total ascending'},
-            showlegend=False
+            title='Topp 5 Høyeste Forbrukere',
+            xaxis_title='Prosjekt',
+            yaxis_title='Forbruk',
+            barmode='group',
+            showlegend=True
         )
         
         return fig
     
-    def create_efficiency_chart(self, electricity_df, static_df):
-        """Create efficiency metrics chart"""
-        # Merge data
-        from data_processor import DataProcessor
-        processor = DataProcessor()
-        merged_df = processor.merge_consumption_with_static(electricity_df, static_df)
-        
+    def create_efficiency_chart_from_merged(self, merged_df):
+        """Create efficiency chart showing kWh per student vs kWh per m²"""
         # Filter out projects with no consumption or capacity data
         efficiency_df = merged_df[
             (merged_df['Year_total_KwH'] > 0) & 
-            (merged_df['total_HE'] > 0) & 
-            (merged_df['kwh_per_student'] > 0)
+            (merged_df['kwh_per_student'] > 0) &
+            (merged_df['kwh_per_m2'] > 0)
         ].copy()
         
         if not efficiency_df.empty:
             fig = px.scatter(
                 efficiency_df,
-                x='total_HE',
+                x='kwh_per_m2',
                 y='kwh_per_student',
                 size='Year_total_KwH',
                 color='City',
                 hover_data=['project_name', 'Year_total_KwH'],
-                title='Energy Efficiency: kWh per Student vs Number of Students',
+                title='Energieffektivitet: kWh per Student vs kWh per m²',
                 labels={
-                    'total_HE': 'Number of Students (HE)',
+                    'kwh_per_m2': 'kWh per m²',
                     'kwh_per_student': 'kWh per Student',
-                    'Year_total_KwH': 'Total Consumption'
+                    'Year_total_KwH': 'Totalt Forbruk'
                 }
             )
             
             fig.update_layout(
-                xaxis_title='Number of Students (HE)',
+                xaxis_title='kWh per m²',
                 yaxis_title='kWh per Student'
             )
             
@@ -128,12 +154,12 @@ class ChartUtils:
         else:
             fig = go.Figure()
             fig.add_annotation(
-                text="No efficiency data available",
+                text="Ingen effektivitetsdata tilgjengelig",
                 xref="paper", yref="paper",
                 x=0.5, y=0.5, xanchor='center', yanchor='middle',
                 showarrow=False, font_size=16
             )
-            fig.update_layout(title='Energy Efficiency Analysis')
+            fig.update_layout(title='Energieffektivitetsanalyse')
             return fig
     
     def create_temperature_correlation_chart(self, temp_df, electricity_df):
@@ -246,7 +272,7 @@ class ChartUtils:
             # Update layout
             fig.update_layout(
                 title="Temperatur og Energiforbruk Analyse",
-                height=800,
+                height=900,
                 showlegend=True,
                 legend=dict(x=1.05, y=1)
             )
@@ -528,4 +554,76 @@ class ChartUtils:
                 showarrow=False, font_size=14
             )
             fig.update_layout(title='Prosjektsammenligning')
+            return fig
+    
+    def create_project_comparison_chart_student(self, comparison_data):
+        """Create comparison chart for kWh per student"""
+        try:
+            if comparison_data.empty:
+                return go.Figure()
+            
+            fig = go.Figure()
+            
+            fig.add_trace(go.Bar(
+                x=comparison_data['project_name'],
+                y=comparison_data['kwh_per_student'],
+                marker_color='lightblue',
+                text=comparison_data['kwh_per_student'].round(0),
+                textposition='auto',
+            ))
+            
+            fig.update_layout(
+                title='kWh per Student Sammenligning',
+                xaxis_title='Prosjekt',
+                yaxis_title='kWh per Student',
+                height=400
+            )
+            
+            return fig
+            
+        except Exception as e:
+            fig = go.Figure()
+            fig.add_annotation(
+                text=f"Feil ved oppretting av sammenligningsdiagram: {str(e)}",
+                xref="paper", yref="paper",
+                x=0.5, y=0.5, xanchor='center', yanchor='middle',
+                showarrow=False, font_size=14
+            )
+            fig.update_layout(title='kWh per Student Sammenligning')
+            return fig
+    
+    def create_project_comparison_chart_m2(self, comparison_data):
+        """Create comparison chart for kWh per m²"""
+        try:
+            if comparison_data.empty:
+                return go.Figure()
+            
+            fig = go.Figure()
+            
+            fig.add_trace(go.Bar(
+                x=comparison_data['project_name'],
+                y=comparison_data['kwh_per_m2'],
+                marker_color='lightcoral',
+                text=comparison_data['kwh_per_m2'].round(0),
+                textposition='auto',
+            ))
+            
+            fig.update_layout(
+                title='kWh per m² Sammenligning',
+                xaxis_title='Prosjekt',
+                yaxis_title='kWh per m²',
+                height=400
+            )
+            
+            return fig
+            
+        except Exception as e:
+            fig = go.Figure()
+            fig.add_annotation(
+                text=f"Feil ved oppretting av sammenligningsdiagram: {str(e)}",
+                xref="paper", yref="paper",
+                x=0.5, y=0.5, xanchor='center', yanchor='middle',
+                showarrow=False, font_size=14
+            )
+            fig.update_layout(title='kWh per m² Sammenligning')
             return fig
