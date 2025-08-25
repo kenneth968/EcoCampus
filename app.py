@@ -171,7 +171,7 @@ def main():
             if not filtered_merged.empty:
                 # Create map with selected color metric using global min/max
                 folium_map, _, _ = map_utils.create_energy_map(filtered_merged, color_metric, (global_min, global_max))
-                st_folium(folium_map, width=700, height=500)
+                st_folium(folium_map, width=1000, height=700)
                 
                 # Dynamic map legend based on global data range
                 metric_name = 'kWh per m²' if color_metric == 'kwh_per_m2' else 'kWh per student'
