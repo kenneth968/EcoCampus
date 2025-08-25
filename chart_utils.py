@@ -175,7 +175,7 @@ class ChartUtils:
                                "Graddager vs Forbruk", "Temperatur vs Forbruk"),
                 specs=[[{"secondary_y": True}, {"secondary_y": False}],
                        [{"secondary_y": False}, {"secondary_y": False}]],
-                vertical_spacing=0.12
+                vertical_spacing=0.15
             )
             
             # Chart 1: Temperature and Degree Days over time
