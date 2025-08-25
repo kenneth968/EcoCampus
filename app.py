@@ -77,7 +77,16 @@ def main():
         # Project filter - only show projects from selected city
         if not show_all_data:
             projects = ['Alle'] + sorted(city_filtered_data['project_name'].unique().tolist())
-            selected_project = st.sidebar.selectbox("Velg prosjekt", projects)
+            # Use session state to maintain selection
+            if 'selected_project' not in st.session_state:
+                st.session_state.selected_project = 'Alle'
+            selected_project = st.sidebar.selectbox(
+                "Velg prosjekt", 
+                projects, 
+                index=projects.index(st.session_state.selected_project) if st.session_state.selected_project in projects else 0,
+                key="project_selector"
+            )
+            st.session_state.selected_project = selected_project
         else:
             selected_project = 'Alle'
         
@@ -113,10 +122,20 @@ def main():
         
         if selected_project != 'Alle':
             filtered_merged = filtered_merged[filtered_merged['project_name'] == selected_project]
-            # Also filter temperature data by project location if specific project is selected
+            # Also filter electricity and temperature data by project location if specific project is selected
             if not filtered_merged.empty:
                 project_city = filtered_merged['City'].iloc[0]
-                filtered_temp = filtered_temp[filtered_temp['City'] == project_city]
+                project_year = filtered_merged['Year'].iloc[0] if 'Year' in filtered_merged.columns else None
+                
+                # Filter temperature data by city and year if available
+                filtered_temp = temp_data[temp_data['City'] == project_city]
+                if project_year and selected_year != 'Alle':
+                    filtered_temp = filtered_temp[filtered_temp['Year'] == int(selected_year)]
+                
+                # Filter electricity data by project name
+                filtered_electricity = electricity_data[electricity_data['project_name'] == selected_project]
+                if selected_year != 'Alle':
+                    filtered_electricity = filtered_electricity[filtered_electricity['Year'] == int(selected_year)]
         
         # Main dashboard
         col1, col2, col3, col4 = st.columns(4)
@@ -233,30 +252,65 @@ def main():
         with tab4:
             st.subheader("Sammenligning")
             
-            if not filtered_merged.empty:
-                # High vs Low consumption comparison
-                col1, col2 = st.columns(2)
+            # Multi-project selection for comparison
+            st.write("**Velg prosjekter å sammenligne:**")
+            available_projects = city_filtered_data['project_name'].unique().tolist()
+            
+            if 'comparison_projects' not in st.session_state:
+                st.session_state.comparison_projects = []
+            
+            comparison_projects = st.multiselect(
+                "Prosjekter for sammenligning:",
+                available_projects,
+                default=st.session_state.comparison_projects,
+                key="comparison_selector"
+            )
+            st.session_state.comparison_projects = comparison_projects
+            
+            if comparison_projects:
+                # Filter data for selected projects
+                comparison_data = city_filtered_data[
+                    city_filtered_data['project_name'].isin(comparison_projects)
+                ]
                 
-                with col1:
-                    st.write("**Høyt forbruk (Topp 25%)**")
-                    high_consumption = filtered_merged.nlargest(max(1, len(filtered_merged)//4), 'Year_total_KwH')
-                    st.dataframe(high_consumption[['project_name', 'City', 'Year_total_KwH', 'kwh_per_student', 'kwh_per_m2']])
-                
-                with col2:
-                    st.write("**Lavt forbruk (Bunn 25%)**")
-                    # Filter out projects with 0 consumption for bottom comparison
-                    filtered_for_low = filtered_merged[filtered_merged['Year_total_KwH'] > 0]
-                    if not filtered_for_low.empty:
-                        low_consumption = filtered_for_low.nsmallest(max(1, len(filtered_for_low)//4), 'Year_total_KwH')
-                        st.dataframe(low_consumption[['project_name', 'City', 'Year_total_KwH', 'kwh_per_student', 'kwh_per_m2']])
-                    else:
-                        st.write("Ingen data med forbruk > 0")
-                
-                # Efficiency scatter plot
-                efficiency_scatter = chart_utils.create_efficiency_scatter(filtered_merged)
-                st.plotly_chart(efficiency_scatter, use_container_width=True)
+                if not comparison_data.empty:
+                    # Comparison table
+                    st.write(f"**Sammenligning av {len(comparison_projects)} prosjekt(er):**")
+                    comparison_table = comparison_data[[
+                        'project_name', 'City', 'Year_total_KwH', 
+                        'kwh_per_student', 'kwh_per_m2', 'total_HE', 'Total_BRA'
+                    ]].round(1)
+                    st.dataframe(comparison_table, use_container_width=True)
+                    
+                    # Comparison chart
+                    comparison_chart = chart_utils.create_project_comparison_chart(comparison_data)
+                    st.plotly_chart(comparison_chart, use_container_width=True)
+                else:
+                    st.warning("Ingen data tilgjengelig for de valgte prosjektene.")
             else:
-                st.warning("Utilstrekkelige data for sammenligning.")
+                # Default view - show high vs low consumption
+                if not filtered_merged.empty:
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.write("**Høyt forbruk (Topp 25%)**")
+                        high_consumption = filtered_merged.nlargest(max(1, len(filtered_merged)//4), 'Year_total_KwH')
+                        st.dataframe(high_consumption[['project_name', 'City', 'Year_total_KwH', 'kwh_per_student', 'kwh_per_m2']])
+                    
+                    with col2:
+                        st.write("**Lavt forbruk (Bunn 25%)**")
+                        filtered_for_low = filtered_merged[filtered_merged['Year_total_KwH'] > 0]
+                        if not filtered_for_low.empty:
+                            low_consumption = filtered_for_low.nsmallest(max(1, len(filtered_for_low)//4), 'Year_total_KwH')
+                            st.dataframe(low_consumption[['project_name', 'City', 'Year_total_KwH', 'kwh_per_student', 'kwh_per_m2']])
+                        else:
+                            st.write("Ingen data med forbruk > 0")
+                    
+                    # Efficiency scatter plot
+                    efficiency_scatter = chart_utils.create_efficiency_scatter(filtered_merged)
+                    st.plotly_chart(efficiency_scatter, use_container_width=True)
+                else:
+                    st.warning("Utilstrekkelige data for sammenligning.")
         
         # Export functionality
         st.sidebar.markdown("---")

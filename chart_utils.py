@@ -467,3 +467,65 @@ class ChartUtils:
             )
             fig.update_layout(title='Energieffektivitetsanalyse')
             return fig
+    
+    def create_project_comparison_chart(self, comparison_data):
+        """Create comparison chart for selected projects"""
+        try:
+            if comparison_data.empty:
+                return go.Figure()
+            
+            # Create grouped bar chart comparing projects
+            fig = go.Figure()
+            
+            # Add kWh per student bars
+            fig.add_trace(go.Bar(
+                name='kWh per student',
+                x=comparison_data['project_name'],
+                y=comparison_data['kwh_per_student'],
+                yaxis='y',
+                marker_color='lightblue',
+                text=comparison_data['kwh_per_student'].round(0),
+                textposition='auto',
+            ))
+            
+            # Add kWh per m² bars on secondary y-axis
+            fig.add_trace(go.Bar(
+                name='kWh per m²',
+                x=comparison_data['project_name'],
+                y=comparison_data['kwh_per_m2'],
+                yaxis='y2',
+                marker_color='lightcoral',
+                text=comparison_data['kwh_per_m2'].round(0),
+                textposition='auto',
+                opacity=0.7
+            ))
+            
+            # Update layout for dual y-axis
+            fig.update_layout(
+                title='Prosjektsammenligning: Energieffektivitet',
+                xaxis=dict(title='Prosjekter'),
+                yaxis=dict(
+                    title='kWh per student',
+                    side='left'
+                ),
+                yaxis2=dict(
+                    title='kWh per m²',
+                    side='right',
+                    overlaying='y'
+                ),
+                barmode='group',
+                height=500
+            )
+            
+            return fig
+            
+        except Exception as e:
+            fig = go.Figure()
+            fig.add_annotation(
+                text=f"Feil ved oppretting av sammenligningsdiagram: {str(e)}",
+                xref="paper", yref="paper",
+                x=0.5, y=0.5, xanchor='center', yanchor='middle',
+                showarrow=False, font_size=14
+            )
+            fig.update_layout(title='Prosjektsammenligning')
+            return fig
