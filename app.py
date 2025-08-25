@@ -12,7 +12,7 @@ from streamlit_folium import st_folium
 
 # Set page configuration
 st.set_page_config(
-    page_title="Miljøfyrtårn EMS Dashboard",
+    page_title="Energioversikt studentboliger",
     page_icon="🌿",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -30,7 +30,7 @@ def get_merged_data(processor, electricity_data, static_data, selected_year):
     return processor.merge_consumption_with_static(electricity_data, static_data, selected_year)
 
 def main():
-    st.title("🌿 Miljøfyrtårn Miljøledelsessystem")
+    st.title("🌿 Energioversikt studentboliger")
     st.markdown("*Energiforbruk i Studentboliger*")
     
     # Load data
