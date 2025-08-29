@@ -4,6 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
+import scipy.stats as stats
 from data_processor import DataProcessor
 from map_utils import MapUtils
 from chart_utils import ChartUtils
@@ -228,8 +229,6 @@ def main():
                 # Show correlation statistics if available
                 correlation_data = chart_utils.merge_temp_consumption_data(filtered_temp, filtered_electricity)
                 if not correlation_data.empty and len(correlation_data) > 1:
-                    import scipy.stats as stats
-                    
                     # Calculate correlations
                     temp_corr = stats.pearsonr(correlation_data['Temperature'], correlation_data['Monthly_Consumption'])
                     hdd_corr = stats.pearsonr(correlation_data['Monthly_HDD'], correlation_data['Monthly_Consumption'])
